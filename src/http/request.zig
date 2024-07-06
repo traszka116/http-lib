@@ -1,9 +1,7 @@
 const std = @import("std");
-const Uri = std.Uri;
 const mem = std.mem;
 const io = std.io;
 const fmt = std.fmt;
-const net = std.net;
 const Map = std.ArrayHashMap;
 
 const types = @import("types.zig");
