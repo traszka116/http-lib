@@ -215,6 +215,42 @@ pub const StatusCode = enum(u10) {
     }
 };
 
+pub const ContentType = union(enum) {
+    html,
+    javascript,
+    css,
+    xml,
+    json,
+    text,
+    pdf,
+    jpg,
+    png,
+    gif,
+    svg,
+    mp3,
+    mp4,
+    other: []const u8,
+
+    pub fn to_str(self: ContentType) []const u8 {
+        return switch (self) {
+            .html => "text/html",
+            .javascript => "application/javascript",
+            .css => "text/css",
+            .json => "application/json",
+            .text => "text/plain",
+            .pdf => "application/pdf",
+            .jpg => "image/jpeg",
+            .png => "image/png",
+            .gif => "image/gif",
+            .svg => "image/svg+xml",
+            .mp3 => "audio/mpeg",
+            .mp4 => "video/mp4",
+            .xml => "application/xml",
+            .other => |other| other,
+        };
+    }
+};
+
 test "Request" {
     _ = Method;
     _ = Version;
