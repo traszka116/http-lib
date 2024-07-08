@@ -53,7 +53,7 @@ pub const Request = struct {
 
         const url_end = mem.indexOfScalar(u8, url_str, '?') orelse url_str.len;
         const resource = url_str[0..url_end];
-        const query: ?[]const u8 = if (url_end == url_str.len or url_end == url_str.len - 1 ) null else url_str[url_end+1..];
+        const query: ?[]const u8 = if (url_end == url_str.len or url_end == url_str.len - 1) null else url_str[url_end + 1 ..];
 
         var request = Request{
             .method = method,
@@ -105,7 +105,7 @@ pub const Request = struct {
         const body_start = iter.next();
         if (body_start == null) return request;
 
-        const body_start_index: usize = @intFromPtr(bytes.ptr) - @intFromPtr(body_start.?.ptr);
+        const body_start_index: usize = @intFromPtr(body_start.?.ptr) - @intFromPtr(bytes.ptr);
         const end_index = if (content_lenght) |len| @min(body_start_index + len, bytes.len) else bytes.len;
         request.body = bytes[body_start_index..end_index];
 
