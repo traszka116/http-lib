@@ -26,9 +26,8 @@ const Route = struct {
             else => self.default,
         };
     }
-};
 
-pub fn intoRoute(some_ptr: anytype) Route {
+    pub fn intoRoute(some_ptr: anytype) Route {
     if (@typeInfo(@TypeOf(some_ptr)) != .Pointer) {
         @compileError("Expected a pointer.");
     }
@@ -47,6 +46,9 @@ pub fn intoRoute(some_ptr: anytype) Route {
         .patch = if (@hasDecl(@TypeOf(some_ptr.*), "patch") and @TypeOf(&@TypeOf(some_ptr.*).patch) == fn (*anyopaque, http.Request, mem.Allocator) anyerror!Connection) @ptrCast(&@TypeOf(some_ptr.*).patch) else null,
     };
 }
+
+};
+
 
 pub const Router = struct {
     map: StaticStringMap(Route),
