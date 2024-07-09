@@ -121,7 +121,7 @@ pub const Request = struct {
             "content-tYpe: text/plain\r\n" ++
             "content-Length:10\r\n" ++
             "connectioN:\t keep-alive \r\n\r\n";
-        var request = try parse(request_bytes, std.testing.allocator);
+        var request = try parse(request_bytes, std.testing.allocator, io.null_writer.any());
         defer request.deinit();
         try testing.expectEqual(request.body, null);
         try testing.expectEqualSlices(u8, request.url, "/hi");

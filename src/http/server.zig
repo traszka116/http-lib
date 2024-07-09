@@ -1,22 +1,20 @@
 const std = @import("std");
 const net = std.net;
 const mem = std.mem;
-const fmt = std.fmt;
 
 const http = @import("http.zig");
 const types = http.types;
 const Request = http.Request;
 const Response = http.Response;
 
-
 pub const Server = struct {
     listener: net.Server,
     context: *anyopaque,
-    response: *const fn (*Server, Request) anyerror!types.Connection,
+    response: *const fn (*anyopaque, Request, mem.Allocator) anyerror!types.Connection,
     allocator: mem.Allocator,
     buffer_size: usize,
 
-    pub fn init(address: net.Address, allocator: mem.Allocator, buffer_size: usize, response: *const fn (*Server, Request) anyerror!types.Connection, context: *anyopaque) !Server {
+    pub fn init(address: net.Address, allocator: mem.Allocator, buffer_size: usize, response: *const fn (*anyopaque, Request, mem.Allocator) anyerror!types.Connection, context: *anyopaque) !Server {
         const server = try address.listen(.{ .reuse_address = true });
         return .{
             .listener = server,
@@ -28,7 +26,7 @@ pub const Server = struct {
     }
 
     pub fn deinit(self: *Server) void {
-        _ = self;
+        self.listener.deinit();
     }
 
     pub fn run(self: *Server) !void {
@@ -51,6 +49,6 @@ pub const Server = struct {
         var req = try Request.parse(bytes, server.allocator, stream.writer().any());
         errdefer req.deinit();
         defer req.deinit();
-        return try server.response(server, req);
+        return server.response(server.context, req, server.allocator);
     }
 };

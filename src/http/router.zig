@@ -1,21 +1,22 @@
-const std = @import("std");
-const enums = std.enums;
-
 const http = @import("http.zig");
-const types = http.types;
-const Request = http.Request;
-const Response = http.Response;
+const Method = http.types.Method;
+const Connection = http.types.Connection;
 
-pub const Handler = fn (*http.Server, Request) anyerror!types.Connection;
+const std = @import("std");
+const mem = std.mem;
+const StaticStringMap = std.StaticStringMap;
 
-pub const Route = struct {
+const Handler = fn (*anyopaque, http.Request, mem.Allocator) anyerror!Connection;
+
+const Route = struct {
+    context: *anyopaque,
     get: ?*const Handler = null,
     post: ?*const Handler = null,
     put: ?*const Handler = null,
     delete: ?*const Handler = null,
     patch: ?*const Handler = null,
     default: *const Handler,
-    pub fn dispatch(self: Route, method: types.Method) *const Handler {
+    pub fn dispatch(self: Route, method: Method) *const Handler {
         return switch (method) {
             .GET => self.get orelse self.default,
             .POST => self.post orelse self.default,
@@ -27,31 +28,42 @@ pub const Route = struct {
     }
 };
 
-pub const Router = struct {
-    routes: std.StringHashMap(Route),
-    notFound: *const Handler,
-    context: *anyopaque,
+pub fn intoRoute(some_ptr: anytype) Route {
+    if (@typeInfo(@TypeOf(some_ptr)) != .Pointer) {
+        @compileError("Expected a pointer.");
+    }
 
-    pub fn init(allocator: std.mem.Allocator, notFound: *const Handler, context: *anyopaque) Router {
+    if (!@hasDecl(@TypeOf(some_ptr.*), "default")) {
+        @compileError("No default handler found.");
+    }
+
+    return Route{
+        .context = @constCast(@ptrCast(some_ptr)),
+        .default = @ptrCast(&@TypeOf(some_ptr.*).default),
+        .get = if (@hasDecl(@TypeOf(some_ptr.*), "get") and @TypeOf(&@TypeOf(some_ptr.*).get) == fn (*anyopaque, http.Request, mem.Allocator) anyerror!Connection) @ptrCast(&@TypeOf(some_ptr.*).get) else null,
+        .post = if (@hasDecl(@TypeOf(some_ptr.*), "post") and @TypeOf(&@TypeOf(some_ptr.*).post) == fn (*anyopaque, http.Request, mem.Allocator) anyerror!Connection) @ptrCast(&@TypeOf(some_ptr.*).post) else null,
+        .put = if (@hasDecl(@TypeOf(some_ptr.*), "put") and @TypeOf(&@TypeOf(some_ptr.*).put) == fn (*anyopaque, http.Request, mem.Allocator) anyerror!Connection) @ptrCast(&@TypeOf(some_ptr.*).put) else null,
+        .delete = if (@hasDecl(@TypeOf(some_ptr.*), "delete") and @TypeOf(&@TypeOf(some_ptr.*).delete) == fn (*anyopaque, http.Request, mem.Allocator) anyerror!Connection) @ptrCast(&@TypeOf(some_ptr.*).delete) else null,
+        .patch = if (@hasDecl(@TypeOf(some_ptr.*), "patch") and @TypeOf(&@TypeOf(some_ptr.*).patch) == fn (*anyopaque, http.Request, mem.Allocator) anyerror!Connection) @ptrCast(&@TypeOf(some_ptr.*).patch) else null,
+    };
+}
+
+const Router = struct {
+    map: StaticStringMap(Route),
+    /// takes in empty context, request and allocator
+    notFound: *const Handler,
+
+    pub fn init(not_found: *const Handler, routes: []struct { []const u8, Route }) Router {
         return Router{
-            .routes = std.StringHashMap(Route).init(allocator),
-            .notFound = notFound,
-            .context = context,
+            .map = StaticStringMap(Route).initComptime(routes),
+            .notFound = not_found,
         };
     }
 
-    pub fn set(self: *Router, path: []const u8, route: Route) !void {
-        try self.routes.put(path, route);
-    }
-
-    fn dispatch(self: Router, request: Request) *const Handler {
-        const route = self.routes.get(request.url) orelse return self.notFound;
-        return route.dispatch(request.method);
-    }
-
-    pub fn handle(server: *http.Server, request: Request) anyerror!types.Connection {
-        var router: *Router = @ptrCast(@alignCast(server.context));
-        const handler = router.dispatch(request);
-        return handler(server, request);
+    pub fn handle(self: *anyopaque, request: http.Request, allocator: mem.Allocator) anyerror!Connection {
+        const router: *Router = @ptrCast(@alignCast(self));
+        const route = router.map.get(request.url) orelse return router.notFound(&.{}, request, allocator);
+        const handler = route.dispatch(request.method);
+        return handler(@ptrCast(route), request, allocator);
     }
 };
