@@ -48,7 +48,7 @@ pub fn intoRoute(some_ptr: anytype) Route {
     };
 }
 
-const Router = struct {
+pub const Router = struct {
     map: StaticStringMap(Route),
     /// takes in empty context, request and allocator
     notFound: *const Handler,
