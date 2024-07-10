@@ -6,9 +6,9 @@ const std = @import("std");
 const mem = std.mem;
 const StaticStringMap = std.StaticStringMap;
 
-const Handler = fn (*anyopaque, http.Request, mem.Allocator) anyerror!Connection;
+pub const Handler = fn (*anyopaque, http.Request, mem.Allocator) anyerror!Connection;
 
-const Route = struct {
+pub const Route = struct {
     context: *anyopaque,
     get: ?*const Handler = null,
     post: ?*const Handler = null,
