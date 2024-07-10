@@ -57,7 +57,7 @@ pub const Router = struct {
 
     pub fn init(not_found: *const Handler, allocator: mem.Allocator, routes: []const struct { []const u8, Route }) Router {
         var map = StringHashMap(Route).init(allocator);
-        try map.ensureTotalCapacity(routes.len);
+        try map.ensureTotalCapacity(@truncate(routes.len));
 
         for (routes) |route| {
             map.putAssumeCapacity(route[0], route[1]);
