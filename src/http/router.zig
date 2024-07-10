@@ -55,7 +55,7 @@ pub const Router = struct {
     /// takes in empty context, request and allocator
     notFound: *const Handler,
 
-    pub fn init(not_found: *const Handler, routes: []struct { []const u8, Route }) Router {
+    pub fn init(not_found: *const Handler, routes: []const struct { []const u8, Route }) Router {
         return Router{
             .map = StaticStringMap(Route).initComptime(routes),
             .notFound = not_found,
