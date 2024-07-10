@@ -35,7 +35,7 @@ pub const Server = struct {
             const connection = self.listener.accept() catch continue;
             var stream = connection.stream;
             while (handleRequest(self, buf, stream)) |conn| {
-                if(conn == .close) {
+                if(conn == .Close) {
                     stream.close();
                     break;
 
