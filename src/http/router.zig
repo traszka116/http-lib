@@ -66,6 +66,6 @@ pub const Router = struct {
         const router: *Router = @ptrCast(@alignCast(self));
         const route = router.map.get(request.url) orelse return router.notFound(@constCast(@ptrCast(&.{})), request, allocator);
         const handler = route.dispatch(request.method);
-        return handler(@ptrCast(route), request, allocator);
+        return handler(@ptrCast(&route), request, allocator);
     }
 };
