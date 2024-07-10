@@ -4,7 +4,7 @@ const Connection = http.types.Connection;
 
 const std = @import("std");
 const mem = std.mem;
-const StaticStringMap = std.StaticStringMap;
+const StringHashMap = std.StringHashMap;
 
 pub const Handler = fn (*anyopaque, http.Request, mem.Allocator) anyerror!Connection;
 
@@ -51,16 +51,32 @@ pub const Route = struct {
 
 
 pub const Router = struct {
-    map: StaticStringMap(Route),
+    map: StringHashMap(Route),
     /// takes in empty context, request and allocator
     notFound: *const Handler,
 
-    pub fn init(not_found: *const Handler, routes: []const struct { []const u8, Route }) Router {
+    pub fn init(not_found: *const Handler, allocator: mem.Allocator, routes: []struct { []const u8, Route }) Router {
+        var map = StringHashMap(Route).init(allocator);
+        try map.ensureTotalCapacity(routes.len);
+
+        for (routes) |route| {
+            map.putAssumeCapacity(route[0], route[1]);
+        }
+
         return Router{
-            .map = StaticStringMap(Route).initComptime(routes),
+            .map = map,
             .notFound = not_found,
         };
     }
+
+    pub fn deinit(self: *Router, allocator: mem.Allocator) void {
+        self.map.deinit(allocator);
+    }
+
+    pub fn addRoute(self: *Router, path: []const u8, route: Route) !void {
+        try self.map.put(path, route);
+    }
+
 
     pub fn handle(self: *anyopaque, request: http.Request, allocator: mem.Allocator) anyerror!Connection {
         const router: *Router = @ptrCast(@alignCast(self));
