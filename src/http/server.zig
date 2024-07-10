@@ -34,12 +34,12 @@ pub const Server = struct {
         while (true) {
             const connection = self.listener.accept() catch continue;
             var stream = connection.stream;
-            while (handleRequest(self, buf, stream)) |conn| {
-                if (conn == .Close) {
-                    stream.close();
-                    break;
-                }
-            } else |err| std.log.err("{}", .{err});
+            while (handleRequest(self, buf, stream) != .Close) {} else |err| {
+                std.log.err("{}", .{err});
+                stream.close();
+                continue;
+            }
+            stream.close();
         }
     }
 
