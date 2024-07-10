@@ -27,28 +27,29 @@ pub const Route = struct {
         };
     }
 
-    pub fn intoRoute(some_ptr: anytype) Route {
-    if (@typeInfo(@TypeOf(some_ptr)) != .Pointer) {
-        @compileError("Expected a pointer.");
+    pub fn from(some_ptr: anytype) Route {
+        if (@typeInfo(@TypeOf(some_ptr)) != .Pointer) {
+            @compileError("Expected a pointer.");
+        }
+
+        if (!@hasDecl(@TypeOf(some_ptr.*), "default")) {
+            @compileError("No default handler found.");
+        }
+
+        std.log.debug("context no cast: {}", .{@intFromPtr(some_ptr)});
+        std.log.debug("context as cast: {}", .{@intFromPtr(@as(*anyopaque, @alignCast(@ptrCast(some_ptr))))});
+
+        return Route{
+            .context = @alignCast(@ptrCast(some_ptr)),
+            .default = @ptrCast(&@TypeOf(some_ptr.*).default),
+            .get = if (@hasDecl(@TypeOf(some_ptr.*), "get") and @TypeOf(&@TypeOf(some_ptr.*).get) == fn (*anyopaque, http.Request, mem.Allocator) anyerror!Connection) @ptrCast(&@TypeOf(some_ptr.*).get) else null,
+            .post = if (@hasDecl(@TypeOf(some_ptr.*), "post") and @TypeOf(&@TypeOf(some_ptr.*).post) == fn (*anyopaque, http.Request, mem.Allocator) anyerror!Connection) @ptrCast(&@TypeOf(some_ptr.*).post) else null,
+            .put = if (@hasDecl(@TypeOf(some_ptr.*), "put") and @TypeOf(&@TypeOf(some_ptr.*).put) == fn (*anyopaque, http.Request, mem.Allocator) anyerror!Connection) @ptrCast(&@TypeOf(some_ptr.*).put) else null,
+            .delete = if (@hasDecl(@TypeOf(some_ptr.*), "delete") and @TypeOf(&@TypeOf(some_ptr.*).delete) == fn (*anyopaque, http.Request, mem.Allocator) anyerror!Connection) @ptrCast(&@TypeOf(some_ptr.*).delete) else null,
+            .patch = if (@hasDecl(@TypeOf(some_ptr.*), "patch") and @TypeOf(&@TypeOf(some_ptr.*).patch) == fn (*anyopaque, http.Request, mem.Allocator) anyerror!Connection) @ptrCast(&@TypeOf(some_ptr.*).patch) else null,
+        };
     }
-
-    if (!@hasDecl(@TypeOf(some_ptr.*), "default")) {
-        @compileError("No default handler found.");
-    }
-
-    return Route{
-        .context = (@ptrCast(some_ptr)),
-        .default = @ptrCast(&@TypeOf(some_ptr.*).default),
-        .get = if (@hasDecl(@TypeOf(some_ptr.*), "get") and @TypeOf(&@TypeOf(some_ptr.*).get) == fn (*anyopaque, http.Request, mem.Allocator) anyerror!Connection) @ptrCast(&@TypeOf(some_ptr.*).get) else null,
-        .post = if (@hasDecl(@TypeOf(some_ptr.*), "post") and @TypeOf(&@TypeOf(some_ptr.*).post) == fn (*anyopaque, http.Request, mem.Allocator) anyerror!Connection) @ptrCast(&@TypeOf(some_ptr.*).post) else null,
-        .put = if (@hasDecl(@TypeOf(some_ptr.*), "put") and @TypeOf(&@TypeOf(some_ptr.*).put) == fn (*anyopaque, http.Request, mem.Allocator) anyerror!Connection) @ptrCast(&@TypeOf(some_ptr.*).put) else null,
-        .delete = if (@hasDecl(@TypeOf(some_ptr.*), "delete") and @TypeOf(&@TypeOf(some_ptr.*).delete) == fn (*anyopaque, http.Request, mem.Allocator) anyerror!Connection) @ptrCast(&@TypeOf(some_ptr.*).delete) else null,
-        .patch = if (@hasDecl(@TypeOf(some_ptr.*), "patch") and @TypeOf(&@TypeOf(some_ptr.*).patch) == fn (*anyopaque, http.Request, mem.Allocator) anyerror!Connection) @ptrCast(&@TypeOf(some_ptr.*).patch) else null,
-    };
-}
-
 };
-
 
 pub const Router = struct {
     map: StringHashMap(Route),
@@ -77,11 +78,10 @@ pub const Router = struct {
         try self.map.put(path, route);
     }
 
-
     pub fn handle(self: *anyopaque, request: http.Request, allocator: mem.Allocator) anyerror!Connection {
         const router: *Router = @ptrCast(@alignCast(self));
         const route = router.map.get(request.url) orelse return router.notFound(@constCast(@ptrCast(&.{})), request, allocator);
         const handler = route.dispatch(request.method);
-        return handler(@constCast(@alignCast(@ptrCast(&route))), request, allocator);
+        return handler(self, request, allocator);
     }
 };
