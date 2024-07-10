@@ -37,7 +37,7 @@ pub const Route = struct {
     }
 
     return Route{
-        .context = @constCast(@ptrCast(some_ptr)),
+        .context = (@ptrCast(some_ptr)),
         .default = @ptrCast(&@TypeOf(some_ptr.*).default),
         .get = if (@hasDecl(@TypeOf(some_ptr.*), "get") and @TypeOf(&@TypeOf(some_ptr.*).get) == fn (*anyopaque, http.Request, mem.Allocator) anyerror!Connection) @ptrCast(&@TypeOf(some_ptr.*).get) else null,
         .post = if (@hasDecl(@TypeOf(some_ptr.*), "post") and @TypeOf(&@TypeOf(some_ptr.*).post) == fn (*anyopaque, http.Request, mem.Allocator) anyerror!Connection) @ptrCast(&@TypeOf(some_ptr.*).post) else null,
@@ -82,6 +82,6 @@ pub const Router = struct {
         const router: *Router = @ptrCast(@alignCast(self));
         const route = router.map.get(request.url) orelse return router.notFound(@constCast(@ptrCast(&.{})), request, allocator);
         const handler = route.dispatch(request.method);
-        return handler(@constCast(@ptrCast(&route)), request, allocator);
+        return handler(@constCast(@alignCast(@ptrCast(&route))), request, allocator);
     }
 };
