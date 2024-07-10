@@ -64,7 +64,7 @@ pub const Router = struct {
 
     pub fn handle(self: *anyopaque, request: http.Request, allocator: mem.Allocator) anyerror!Connection {
         const router: *Router = @ptrCast(@alignCast(self));
-        const route = router.map.get(request.url) orelse return router.notFound(&.{}, request, allocator);
+        const route = router.map.get(request.url) orelse return router.notFound(@ptrCast(&.{}), request, allocator);
         const handler = route.dispatch(request.method);
         return handler(@ptrCast(route), request, allocator);
     }
