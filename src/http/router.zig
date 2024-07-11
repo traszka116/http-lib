@@ -36,11 +36,8 @@ pub const Route = struct {
             @compileError("No default handler found.");
         }
 
-        std.log.debug("context no cast: {}", .{@intFromPtr(some_ptr)});
-        std.log.debug("context as cast: {}", .{@intFromPtr(@as(*anyopaque, @alignCast(@ptrCast(some_ptr))))});
-
         return Route{
-            .context = @alignCast(@ptrCast(some_ptr)),
+            .context = @ptrCast(some_ptr),
             .default = @ptrCast(&@TypeOf(some_ptr.*).default),
             .get = if (@hasDecl(@TypeOf(some_ptr.*), "get") and @TypeOf(&@TypeOf(some_ptr.*).get) == fn (*anyopaque, http.Request, mem.Allocator) anyerror!Connection) @ptrCast(&@TypeOf(some_ptr.*).get) else null,
             .post = if (@hasDecl(@TypeOf(some_ptr.*), "post") and @TypeOf(&@TypeOf(some_ptr.*).post) == fn (*anyopaque, http.Request, mem.Allocator) anyerror!Connection) @ptrCast(&@TypeOf(some_ptr.*).post) else null,
@@ -79,7 +76,7 @@ pub const Router = struct {
     }
 
     pub fn handle(self: *anyopaque, request: http.Request, allocator: mem.Allocator) anyerror!Connection {
-        const router: *Router = @ptrCast(@alignCast(self));
+        const router: *Router = @ptrCast(self);
         const route = router.map.get(request.url) orelse return router.notFound(@constCast(@ptrCast(&.{})), request, allocator);
         const handler = route.dispatch(request.method);
         return handler(self, request, allocator);
