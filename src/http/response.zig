@@ -52,8 +52,9 @@ pub const Response = struct {
     // managed key-value store of headers
     headers: std.StringHashMap([]const u8),
     content: ?ContentInfo,
+    writer: std.io.AnyWriter,
 
-    pub fn init(version: Version, status: StatusCode, connection: Connection, headers: []const Header, content: ?ContentInfo, allocator: mem.Allocator) !Response {
+    pub fn init(version: Version, status: StatusCode, connection: Connection, headers: []const Header, content: ?ContentInfo, allocator: mem.Allocator, writer: std.io.AnyWriter) !Response {
         var header_map = std.StringHashMap([]const u8).init(allocator);
         for (headers) |header| {
             try header_map.put(header.key, header.value);
@@ -64,6 +65,7 @@ pub const Response = struct {
             .connection = connection,
             .headers = header_map,
             .content = content,
+            .writer = writer,
         };
     }
 
@@ -89,5 +91,9 @@ pub const Response = struct {
             _ = try writer.write(content.body);
         }
         _ = try writer.write("\r\n");
+    }
+
+    pub fn send(self: *Response) !void {
+        try self.writer.print("{}", .{self});
     }
 };

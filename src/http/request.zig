@@ -36,9 +36,9 @@ pub const Request = struct {
     content_type: ?[]const u8,
     body: ?[]const u8,
     is_valid: bool = true,
-    writer: std.io.AnyWriter,
 
-    pub fn parse(bytes: []const u8, allocator: mem.Allocator, writer: std.io.AnyWriter) !Request {
+
+    pub fn parse(bytes: []const u8, allocator: mem.Allocator) !Request {
         var iter = mem.splitSequence(u8, bytes, "\r\n");
         const head_line = iter.next() orelse return error.RequestInvalid;
         var head_iterator = mem.splitScalar(u8, head_line, ' ');
@@ -64,7 +64,6 @@ pub const Request = struct {
             .headers = Headers.init(allocator),
             .body = null,
             .content_type = null,
-            .writer = writer,
         };
         errdefer request.headers.deinit();
 
