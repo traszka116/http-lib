@@ -14,3 +14,9 @@ pub const Route = router.Route;
 pub const Application = router.Application;
 
 pub const Handler = router.Handler;
+
+pub const Method = types.Method;
+pub const Version = types.Version;
+pub const Connection = types.Connection;
+pub const StatusCode = types.StatusCode;
+pub const ContentType = types.ContentType;
