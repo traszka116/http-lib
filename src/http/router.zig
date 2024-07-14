@@ -1,84 +1,157 @@
-const http = @import("http.zig");
-const Method = http.types.Method;
-const Connection = http.types.Connection;
-
 const std = @import("std");
+const fmt = std.fmt;
 const mem = std.mem;
-const StringHashMap = std.StringHashMap;
+const types = @import("types.zig");
+const Response = @import("response.zig").Response;
+const Request = @import("request.zig").Request;
 
-pub const Handler = fn (*anyopaque, http.Request, mem.Allocator) anyerror!Connection;
+const Context = *anyopaque;
+const Handler = fn (Context, Request, *Response) anyerror!void;
+
+fn TransformHandler(handler: anytype, comptime T: type) Handler {
+    return struct {
+        fn func(context: Context, req: Request, res: *Response) anyerror!void {
+            const ctx: *T = @ptrCast(@alignCast(context));
+            return @call(.always_inline, handler, .{ ctx, req, res });
+        }
+    }.func;
+}
 
 pub const Route = struct {
-    context: *anyopaque,
+    context: Context,
+    default: *const Handler,
     get: ?*const Handler = null,
     post: ?*const Handler = null,
     put: ?*const Handler = null,
-    delete: ?*const Handler = null,
     patch: ?*const Handler = null,
-    default: *const Handler,
-    pub fn dispatch(self: Route, method: Method) *const Handler {
+    delete: ?*const Handler = null,
+    options: ?*const Handler = null,
+    head: ?*const Handler = null,
+    trace: ?*const Handler = null,
+    connect: ?*const Handler = null,
+
+    pub fn dispatch(self: Route, method: types.Method) *const Handler {
         return switch (method) {
-            .GET => self.get orelse self.default,
-            .POST => self.post orelse self.default,
-            .PATCH => self.patch orelse self.default,
-            .PUT => self.put orelse self.default,
-            .DELETE => self.delete orelse self.default,
-            else => self.default,
+            .OPTIONS => self.options,
+            .GET => self.get,
+            .HEAD => self.head,
+            .POST => self.post,
+            .PUT => self.put,
+            .PATCH => self.patch,
+            .DELETE => self.delete,
+            .TRACE => self.trace,
+            .CONNECT => self.connect,
+        } orelse self.default;
+    }
+
+    pub fn from(context: anytype) Route {
+        if (@typeInfo(@TypeOf(context)) != .Pointer) {
+            @compileError("Context must be a pointer type");
+        }
+
+        const contextType = @TypeOf(context.*);
+        if (!@hasDecl(contextType, "default")) {
+            @compileError("Context must have a default handler");
+        }
+
+        const contextHandlerType = fn (*contextType, Request, *Response) anyerror!void;
+        if (@TypeOf(&contextType.default) != *const contextHandlerType) {
+            @compileError(fmt.comptimePrint("Default handler must be of type :'{}', has type: '{}'", .{ *const contextHandlerType, @TypeOf(&contextType.default) }));
+        }
+
+        const defaultHandler = &TransformHandler(contextType.default, contextType);
+        const getHandler = if (@hasDecl(contextType, "get") and @TypeOf(&contextType.get) == *const contextHandlerType) &TransformHandler(contextType.get, contextType) else null;
+        const postHandler = if (@hasDecl(contextType, "post") and @TypeOf(&contextType.post) == *const contextHandlerType) &TransformHandler(contextType.post, contextType) else null;
+        const putHandler = if (@hasDecl(contextType, "put") and @TypeOf(&contextType.put) == *const contextHandlerType) &TransformHandler(contextType.put, contextType) else null;
+        const patchHandler = if (@hasDecl(contextType, "patch") and @TypeOf(&contextType.patch) == *const contextHandlerType) &TransformHandler(contextType.patch, contextType) else null;
+        const deleteHandler = if (@hasDecl(contextType, "delete") and @TypeOf(&contextType.delete) == *const contextHandlerType) &TransformHandler(contextType.delete, contextType) else null;
+        const optionsHandler = if (@hasDecl(contextType, "options") and @TypeOf(&contextType.options) == *const contextHandlerType) &TransformHandler(contextType.options, contextType) else null;
+        const headHandler = if (@hasDecl(contextType, "head") and @TypeOf(&contextType.head) == *const contextHandlerType) &TransformHandler(contextType.head, contextType) else null;
+        const traceHandler = if (@hasDecl(contextType, "trace") and @TypeOf(&contextType.trace) == *const contextHandlerType) &TransformHandler(contextType.trace, contextType) else null;
+        const connectHandler = if (@hasDecl(contextType, "connect") and @TypeOf(&contextType.connect) == *const contextHandlerType) &TransformHandler(contextType.connect, contextType) else null;
+
+        return Route{
+            .context = context,
+            .default = defaultHandler,
+            .get = getHandler,
+            .post = postHandler,
+            .put = putHandler,
+            .patch = patchHandler,
+            .delete = deleteHandler,
+            .options = optionsHandler,
+            .head = headHandler,
+            .trace = traceHandler,
+            .connect = connectHandler,
         };
     }
 
-    pub fn from(some_ptr: anytype) Route {
-        if (@typeInfo(@TypeOf(some_ptr)) != .Pointer) {
-            @compileError("Expected a pointer.");
-        }
-
-        if (!@hasDecl(@TypeOf(some_ptr.*), "default")) {
-            @compileError("No default handler found.");
-        }
-
-        return Route{
-            .context = @ptrCast(some_ptr),
-            .default = @ptrCast(&@TypeOf(some_ptr.*).default),
-            .get = if (@hasDecl(@TypeOf(some_ptr.*), "get") and @TypeOf(&@TypeOf(some_ptr.*).get) == fn (*anyopaque, http.Request, mem.Allocator) anyerror!Connection) @ptrCast(&@TypeOf(some_ptr.*).get) else null,
-            .post = if (@hasDecl(@TypeOf(some_ptr.*), "post") and @TypeOf(&@TypeOf(some_ptr.*).post) == fn (*anyopaque, http.Request, mem.Allocator) anyerror!Connection) @ptrCast(&@TypeOf(some_ptr.*).post) else null,
-            .put = if (@hasDecl(@TypeOf(some_ptr.*), "put") and @TypeOf(&@TypeOf(some_ptr.*).put) == fn (*anyopaque, http.Request, mem.Allocator) anyerror!Connection) @ptrCast(&@TypeOf(some_ptr.*).put) else null,
-            .delete = if (@hasDecl(@TypeOf(some_ptr.*), "delete") and @TypeOf(&@TypeOf(some_ptr.*).delete) == fn (*anyopaque, http.Request, mem.Allocator) anyerror!Connection) @ptrCast(&@TypeOf(some_ptr.*).delete) else null,
-            .patch = if (@hasDecl(@TypeOf(some_ptr.*), "patch") and @TypeOf(&@TypeOf(some_ptr.*).patch) == fn (*anyopaque, http.Request, mem.Allocator) anyerror!Connection) @ptrCast(&@TypeOf(some_ptr.*).patch) else null,
+    pub fn unimplemented(comptime T: type) type {
+        return struct {
+            pub fn default(context: *T, req: Request, res: *Response) anyerror!void {
+                _ = context;
+                res.connection = .Close;
+                res.status_code = .{ .normal = .@"Not Implemented" };
+                res.content = .{ .content_type = .html, .body = "This route is not implemented yet" };
+                res.version = req.version;
+                try res.send();
+            }
         };
     }
 };
 
-pub const Router = struct {
-    map: StringHashMap(Route),
-    /// takes in empty context, request and allocator
-    notFound: *const Handler,
+pub const Application = struct {
+    router: std.StringHashMap(Route),
+    not_found: Route,
+    server: std.net.Server,
+    allocator: mem.Allocator,
+    request_buffer_size: usize = 4096,
 
-    pub fn init(not_found: *const Handler, allocator: mem.Allocator, routes: []const struct { []const u8, Route }) !Router {
-        var map = StringHashMap(Route).init(allocator);
-        try map.ensureTotalCapacity(@truncate(routes.len));
+    pub fn addRoute(self: *Application, path: []const u8, route: Route) !void {
+        try self.router.put(path, route);
+    }
 
-        for (routes) |route| {
-            map.putAssumeCapacity(route[0], route[1]);
-        }
-
-        return Router{
-            .map = map,
-            .notFound = not_found,
+    pub fn init(server: std.net.Server, allocator: mem.Allocator, not_found: Route) Application {
+        return Application{
+            .server = server,
+            .router = std.StringHashMap(Route).init(allocator),
+            .not_found = not_found,
+            .allocator = allocator,
         };
     }
 
-    pub fn deinit(self: *Router, allocator: mem.Allocator) void {
-        self.map.deinit(allocator);
+    pub fn run(self: *Application) !void {
+        const buffer = try self.allocator.alloc(u8, self.request_buffer_size);
+        while (true) {
+            const connection = self.server.accept() catch |err| {
+                std.log.err("error: {}", .{err});
+                continue;
+            };
+            const stream = connection.stream;
+            handleConnection(self, stream, buffer) catch |err| {
+                std.log.err("error: {}", .{err});
+            };
+        }
     }
 
-    pub fn addRoute(self: *Router, path: []const u8, route: Route) !void {
-        try self.map.put(path, route);
-    }
+    fn handleConnection(self: *Application, stream: std.net.Stream, buffer: []u8) !void {
+        var response = Response.init(.@"HTTP/1.0", .{ .normal = .OK }, .@"Keep-Alive", &.{}, null, stream.writer().any());
+        errdefer stream.close();
+        defer stream.close();
+        while (response.connection == .@"Keep-Alive") {
+            const len = stream.read(buffer) catch |err| {
+                std.log.err("error: {}", .{err});
+                return error.UnexpectedEOF;
+            };
 
-    pub fn handle(self: *anyopaque, request: http.Request, allocator: mem.Allocator) anyerror!Connection {
-        const router: *Router = @alignCast(@ptrCast(self));
-        const route = router.map.get(request.url) orelse return router.notFound(@constCast(@ptrCast(&.{})), request, allocator);
-        const handler = route.dispatch(request.method);
-        return handler(self, request, allocator);
+            const request = Request.parse(buffer[0..len], self.allocator) catch |err| {
+                std.log.err("error: {}", .{err});
+                return error.InvalidRequest;
+            };
+
+            response = Response.init(request.version, .{ .normal = .OK }, request.connection, &.{}, null, stream.writer().any());
+            const route = self.router.get(request.url) orelse self.not_found;
+            const handler = route.dispatch(request.method);
+            try handler(@ptrCast(route.context), request, &response);
+        }
     }
 };
