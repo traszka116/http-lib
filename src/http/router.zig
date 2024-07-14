@@ -97,6 +97,32 @@ pub const Route = struct {
             }
         };
     }
+
+    pub fn notFound(comptime T: type) type {
+        return struct {
+            pub fn default(context: *T, req: Request, res: *Response) anyerror!void {
+                _ = context;
+                res.connection = .Close;
+                res.status_code = .{ .normal = .@"Not Found" };
+                res.content = .{ .content_type = .html, .body = "This route was not found" };
+                res.version = req.version;
+                try res.send();
+            }
+        };
+    }
+
+    pub fn methodNotAllowed(comptime T: type) type {
+        return struct {
+            pub fn default(context: *T, req: Request, res: *Response) anyerror!void {
+                _ = context;
+                res.connection = .Close;
+                res.status_code = .{ .normal = .@"Method Not Allowed" };
+                res.content = .{ .content_type = .html, .body = "This method is not allowed on this route" };
+                res.version = req.version;
+                try res.send();
+            }
+        };
+    }
 };
 
 pub const Application = struct {
