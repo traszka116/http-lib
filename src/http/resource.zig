@@ -11,8 +11,8 @@ const http = @import("./types.zig");
 pub const Resource = struct {
     path: []const u8,
     mime: http.ContentType,
-    file: fs.File,
-
+    content: []const u8,
+    allocator: mem.Allocator,
     pub usingnamespace Route.methodNotAllowed(@This());
 
     fn hash(str: []const u8) usize {
