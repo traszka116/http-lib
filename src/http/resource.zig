@@ -84,25 +84,25 @@ pub const Resource = struct {
         res.version = req.version;
         try res.send();
     }
+
+    pub fn mapDirectory(dir: fs.Dir, allocator: mem.Allocator) !struct { []Resource, std.heap.ArenaAllocator } {
+        var walk = try dir.walk(allocator);
+
+        var arena = std.heap.ArenaAllocator.init(allocator);
+        const alloc = arena.allocator();
+        errdefer _ = arena.reset(.free_all);
+
+        var resources = Vector(Resource).init(allocator);
+
+        while (walk.next()) |entry_opt| {
+            if (entry_opt == null) break;
+            const entry = entry_opt.?;
+            if (entry.kind != .file) continue;
+            const path = entry.path;
+            const resource = try Resource.init(path, dir, alloc);
+            try resources.append(resource);
+        } else |err| return err;
+
+        return .{ resources.toOwnedSlice(), arena };
+    }
 };
-
-pub fn mapDirectory(dir: fs.Dir, allocator: mem.Allocator) !struct { []Resource, std.heap.ArenaAllocator } {
-    var walk = try dir.walk(allocator);
-
-    var arena = std.heap.ArenaAllocator.init(allocator);
-    const alloc = arena.allocator();
-    errdefer _ = arena.reset(.free_all);
-
-    var resources = Vector(Resource).init(allocator);
-
-    while (walk.next()) |entry_opt| {
-        if (entry_opt == null) break;
-        const entry = entry_opt.?;
-        if (entry.kind != .file) continue;
-        const path = entry.path;
-        const resource = try Resource.init(path, dir, alloc);
-        try resources.append(resource);
-    } else |err| return err;
-
-    return .{ resources.toOwnedSlice(), arena };
-}

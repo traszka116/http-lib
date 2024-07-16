@@ -16,3 +16,4 @@ pub const Route = router.Route;
 pub const Application = @import("http/application.zig").Application;
 
 pub const Handler = router.Handler;
+pub const Resource = @import("./http/resource.zig").Resource;
