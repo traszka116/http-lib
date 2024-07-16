@@ -13,8 +13,6 @@ pub const StatusCode = types.StatusCode;
 pub const ContentType = types.ContentType;
 
 pub const Route = router.Route;
-pub const Application = router.Application;
+pub const Application = @import("http/application.zig").Application;
 
 pub const Handler = router.Handler;
-
-
